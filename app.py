@@ -1,18 +1,28 @@
-from flask import Flask, jsonify
+from flask import Flask, request, jsonify
 import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-# 성경 본문을 가져오는 API 엔드포인트
-@app.route('/verse', methods=['GET'])
-def get_verse():
-    url = "https://sum.su.or.kr:8888/bible/today/1000"  # 성경 본문을 가져오는 URL
-    response = requests.get(url)  # 해당 URL로 HTTP GET 요청 보내기
-    
-    if response.status_code == 200:  # 성공적으로 데이터를 받았을 때
-        return jsonify({"verse": response.json()})  # JSON 형식으로 반환
-    else:
-        return jsonify({"error": "Failed to retrieve Bible verse"}), 500  # 오류 처리
+@app.route('/', methods=['POST'])
+def kakao_webhook():
+    # 1. 성경 본문 가져오기
+    url = "https://sum.su.or.kr:8888/bible/today/1000"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, "html.parser")
+    bible_text = soup.select_one('.bible_text').get_text(strip=True)
+    bible_info = soup.select_one('.bibleinfo_box').get_text(strip=True)
 
-if __name__ == '__main__':
-    app.run(debug=True)  # 개발 모드로 서버 실행
+    # 2. 카카오 오픈빌더 응답 형식 맞춰서 리턴
+    return jsonify({
+        "version": "2.0",
+        "template": {
+            "outputs": [
+                {
+                    "simpleText": {
+                        "text": f"{bible_info}\n\n{bible_text}"
+                    }
+                }
+            ]
+        }
+    })
